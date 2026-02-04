@@ -46,15 +46,21 @@ for row in range(GRID_SIZE):
     
     for col in columns:
         x_pos = col * STEP_MM
+
+        # 1. TELL PRINTER TO MOVE
         send_command(f"G1 X{x_pos} Y{y_pos} F3000")
-        
+
+        # 2. THE PAUSE (Crucial for clear photos)
+        # The script stops here and waits 1.5 seconds 
+        # for the gantry to stop shaking.
         # Vibration settling time - crucial for long cables
         time.sleep(1.5) 
         
-        # Capture Image
+        # 3. Capture Image
         file_path = f"{folder_name}/x{col}_y{row}.jpg"
         picam2.capture_file(file_path)
-        print(f"Captured: {file_path}")
+        print(f"Captured point {col} in row {row} file: {file_path}")
+       
 
 picam2.stop()
 send_command("G28 X0 Y0")
