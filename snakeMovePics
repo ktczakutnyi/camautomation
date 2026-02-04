@@ -9,7 +9,7 @@ STEP_MM = 12.7         # 0.5 inches
 START_Z = 127.0        # 5 inches
 GRID_SIZE = 10 
 
-# --- CAMERA SETUP ---
+# --- 1. INITIALIZE CAMERA ---
 picam2 = Picamera2()
 config = picam2.create_still_configuration()
 picam2.configure(config)
@@ -19,7 +19,7 @@ picam2.start()
 folder_name = f"scan_{int(time.time())}"
 os.makedirs(folder_name)
 
-# --- PRINTER CONNECTION ---
+# --- 2. CONNECT TO ENDER 3 ---
 try:
     printer = serial.Serial(PORT, 115200, timeout=1)
     time.sleep(2)
@@ -35,19 +35,34 @@ def send_command(cmd):
         if line == "ok":
             break
 
-# 1. Homing & Setup
-send_command("G28")
-send_command(f"G1 Z{START_Z} F1500")
+# --- 3. PRE-SCAN SETUP ---
+print("Homing printer and lifting to 5 inches...")
+send_command("G28")                      # Home X, Y, and Z
+send_command(f"G1 Z{START_Z} F1500")     # Move to 5 inches high
+send_command("G1 X0 Y0 F3000")           # Ensure we are at the start
 
-# 2. Grid Scan
+# --- 4. FOCUS LOCK ---
+print("Focusing camera and locking...")
+# This triggers one autofocus cycle then locks it for the duration
+picam2.autofocus_cycle() 
+print("Focus Locked.")
+
+
+# --- 5. THE 10x10 GRID SCAN ---
+print(f"Starting 100-point scan. Saving to: {folder_name}")
+
 for row in range(GRID_SIZE):
     y_pos = row * STEP_MM
+
+    # Logic for "Snake" pattern (zigzag)
+    # Even rows go 0 -> 9, Odd rows go 9 -> 0
     columns = range(GRID_SIZE) if row % 2 == 0 else reversed(range(GRID_SIZE))
     
     for col in columns:
         x_pos = col * STEP_MM
 
         # 1. TELL PRINTER TO MOVE
+        print(f"Moving to Row:{row} Col:{col} (X:{x_pos}mm, Y:{y_pos}mm)")
         send_command(f"G1 X{x_pos} Y{y_pos} F3000")
 
         # 2. THE PAUSE (Crucial for clear photos)
@@ -62,5 +77,10 @@ for row in range(GRID_SIZE):
         print(f"Captured point {col} in row {row} file: {file_path}")
        
 
+# --- 6. SHUTDOWN ---
+print("Scan Complete! Retreating to start position...")
 picam2.stop()
-send_command("G28 X0 Y0")
+
+# Move to X0 Y0 while STAYING at the 5-inch (START_Z) height
+# We use F3000 to move quickly
+send_command(f"G1 X0 Y0 Z{START_Z} F3000")
