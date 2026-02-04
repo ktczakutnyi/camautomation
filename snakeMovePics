@@ -1,20 +1,31 @@
 import serial
 import time
+import os
+from picamera2 import Picamera2
 
 # --- CONFIGURATION ---
-PORT = '/dev/ttyUSB0'  # Change to 'COM3' etc. if on Windows
-BAUD = 115200
-STEP_MM = 12.7         # 0.5 inches in mm
-START_Z = 127.0        # 5 inches in mm
-GRID_SIZE = 10         # 10x10
+PORT = '/dev/ttyUSB0'  # Ender 3 USB Port
+STEP_MM = 12.7         # 0.5 inches
+START_Z = 127.0        # 5 inches
+GRID_SIZE = 10 
 
-# 1. Connect to Ender 3
+# --- CAMERA SETUP ---
+picam2 = Picamera2()
+config = picam2.create_still_configuration()
+picam2.configure(config)
+picam2.start()
+
+# Create folder for images
+folder_name = f"scan_{int(time.time())}"
+os.makedirs(folder_name)
+
+# --- PRINTER CONNECTION ---
 try:
-    printer = serial.Serial(PORT, BAUD, timeout=1)
-    time.sleep(2) # Wait for reboot
+    printer = serial.Serial(PORT, 115200, timeout=1)
+    time.sleep(2)
     print("Connected to Ender 3")
 except:
-    print("Failed to connect. Check your Port.")
+    print("Printer connection failed.")
     exit()
 
 def send_command(cmd):
@@ -24,32 +35,26 @@ def send_command(cmd):
         if line == "ok":
             break
 
-# 2. Initialization
-print("Homing and setting height...")
-send_command("G28")          # Home all axes
-send_command(f"G1 Z{START_Z} F1500") # Move to 5 inches high
+# 1. Homing & Setup
+send_command("G28")
+send_command(f"G1 Z{START_Z} F1500")
 
-# 3. The Scan Loop
+# 2. Grid Scan
 for row in range(GRID_SIZE):
-    # Calculate Y position
     y_pos = row * STEP_MM
-    
-    # Logic for zigzag: if row is even, go 0->9. If odd, go 9->0.
     columns = range(GRID_SIZE) if row % 2 == 0 else reversed(range(GRID_SIZE))
     
     for col in columns:
         x_pos = col * STEP_MM
-        
-        # Move to coordinate
-        print(f"Moving to Row {row}, Col {col} (X{x_pos}, Y{y_pos})")
         send_command(f"G1 X{x_pos} Y{y_pos} F3000")
         
-        # 4. Pause and Trigger
-        time.sleep(1.0) # Let vibrations settle
+        # Vibration settling time - crucial for long cables
+        time.sleep(1.5) 
         
-        # --- TRIGGER CAMERA HERE ---
-        # If using a Pi Camera: camera.capture(f'img_{row}_{col}.jpg')
-        print("📸 SNAP!") 
+        # Capture Image
+        file_path = f"{folder_name}/x{col}_y{row}.jpg"
+        picam2.capture_file(file_path)
+        print(f"Captured: {file_path}")
 
-print("Scan Complete! Returning home.")
-send_command("G28 X0 Y0") # Move back to start
+picam2.stop()
+send_command("G28 X0 Y0")
