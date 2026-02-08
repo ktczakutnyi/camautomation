@@ -42,10 +42,10 @@ send_command(f"G1 Z{START_Z} F1500")     # Move to 5 inches high
 send_command("G1 X0 Y0 F3000")           # Ensure we are at the start
 
 # --- 4. FOCUS LOCK ---
-print("Focusing camera and locking...")
-# This triggers one autofocus cycle then locks it for the duration
-picam2.autofocus_cycle() 
-print("Focus Locked.")
+# IMX219 has a fixed-focus lens - no autofocus needed
+print("Camera ready (fixed focus).")
+# Let camera stabilize exposure/white balance
+time.sleep(2)
 
 
 # --- 5. THE 10x10 GRID SCAN ---
