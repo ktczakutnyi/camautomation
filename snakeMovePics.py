@@ -31,18 +31,25 @@ def send_command(cmd):
         if line == "ok":
             break
 
+# Ensure units and positioning mode
+send_command("G21")  # use mm
+send_command("G90")  # absolute positioning
+
 # --- 2. PRE-SCAN MECHANICAL SETUP ---
 print("Homing printer...")
 send_command("G28")                      # Home X, Y, and Z
-time.sleep(3)                            # Wait for homing to fully complete
+send_command("M400")                     # wait for all moves to finish
+time.sleep(1)
 
 print("Lifting to 5 inches...")
 send_command(f"G1 Z{START_Z} F1500")     # Move to 5 inches high
-time.sleep(2)                            # Wait for Z movement to complete
+send_command("M400")                     # wait for Z movement to complete
+time.sleep(0.5)
 
 print("Moving to start position...")
 send_command(f"G1 X{OFFSET_X} Y{OFFSET_Y} F3000")  # Move to offset start position
-time.sleep(2)                            # Wait for XY movement to complete
+send_command("M400")                     # wait for XY movement to complete
+time.sleep(0.5)
 
 # --- 3. NOW initialize camera (after ALL movement confirmed stopped) ---
 print("All mechanical movement complete. Initializing camera...")
@@ -65,8 +72,9 @@ for row in range(GRID_SIZE):
         
         print(f"Moving to Row:{row} Col:{col} (X:{x_pos}mm, Y:{y_pos}mm)")
         send_command(f"G1 X{x_pos} Y{y_pos} F3000")
+        send_command("M400")                 # ensure movement finished before imaging
         
-        time.sleep(1.5)  # Vibration settling
+        time.sleep(0.3)  # short vibration settling
         
         file_path = f"{folder_name}/x{col}_y{row}.jpg"
         picam2.capture_file(file_path)
@@ -76,3 +84,4 @@ for row in range(GRID_SIZE):
 print("Scan Complete! Retreating to start position...")
 picam2.stop()
 send_command(f"G1 X{OFFSET_X} Y{OFFSET_Y} Z{START_Z} F3000")
+send_command("M400")
